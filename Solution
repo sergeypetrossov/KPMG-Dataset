@@ -1,0 +1,191 @@
+library(readxl)
+transactions <- read_excel("KPMGChallenge.xlsx", 
+                           sheet = "Transactions")
+transactions <- data.frame(apply(transactions,1:2,function(x) if( x %in% 'no info') return(NA) else return(x)))
+newcustomer <- read_excel("KPMGChallenge.xlsx", 
+                          sheet = "NewCustomerList")
+demog <- read_excel("KPMGChallenge.xlsx", 
+                    sheet = "CustomerDemographic")
+address <- read_excel("KPMGChallenge.xlsx", 
+                      sheet = "CustomerAddress")
+
+#___
+
+head(address)
+tail(address)
+nrow(address)
+# There are 3999 rows, but the last ID is 4003. This might mean that not all customers are in the dataset
+colnames(address)
+str(address)
+# Postcode looks suspicious
+levels(address$state)
+# New South Wales should be abbreaviated to NSW, and Victoria to Vic
+address$state <- gsub('New South Wales','NSW',address$state)
+address$state <- gsub('Victoria','VIC',address$state)
+address$state <- factor(address$state)
+levels(address$state)
+summary(address)
+#---
+backup_address <- address
+
+nrow(address[complete.cases(address),])
+#It seems that there are no NA
+
+#---
+
+head(demog)
+backup_demog <- demog
+head(demog)
+colnames(demog)
+nrow(demog)
+# There are 4000 rows
+demog <- demog[,c(-11)]
+head(demog,5)
+# We have rid outselves of default column by overwriting
+str(demog)
+# Let's remove empty spaces in customer_id column
+demog$customer_id <- gsub('   ','',demog$customer_id)
+# Let's fix gender and make backup along the way
+backup_demog <- demog
+demog <- backup_demog
+demog <- as.data.frame(demog)
+head(demog,5)
+str(demog)
+demog$gender <- gsub('F','Female',demog$gender,fixed=T,useBytes = T)
+demog$gender <- gsub('Femaleemale','Female',demog$gender,fixed = T,useBytes = T)
+demog$gender <- gsub('Femaleemal','Female',demog$gender,fixed = T,useBytes = T)
+demog$gender <- gsub('U','Unisex',demog$gender,fixed = T)
+demog$gender <- gsub('M','Male',demog$gender,fixed = T,useBytes = T)
+demog$gender <- gsub('Maleale','Male',demog$gender,fixed = T,useBytes = T)
+demog$gender <- factor(demog$gender)
+levels(demog$gender)
+summary(demog)
+
+# Let's fix date of birth into correct format
+head(demog$DOB)
+demog$DOB <- as.Date(as.numeric(demog$DOB), origin = "1899-12-30")
+str(demog)
+#---
+
+# Let's make a back up
+backup_demog2 <- demog
+demog <- backup_demog2
+# Let's investigate NA in the dataset
+demog[!complete.cases(demog),]
+nrow(demog[!complete.cases(demog),]) # Wow, there are 689 incomplete cases out of 4000
+colnames(demog)
+nrow(demog[is.na(demog$customer_id),]) # 0 NA's in ID
+nrow(demog[is.na(demog$first_name),]) # 0 NA's in First Name
+nrow(demog[is.na(demog$last_name),]) # 125 NA's in Last Name - IGNORE
+nrow(demog[is.na(demog$gender),]) # 0 NA's in Gender
+nrow(demog[is.na(demog$past_3_years_bike_related_purchases),]) # 0 NA's
+nrow(demog[is.na(demog$DOB),]) # 87 NA's in Date of Birth - Remove 
+nrow(demog[is.na(demog$job_title),]) # 506 NA's in Job Title - IGNORE
+nrow(demog[is.na(demog$job_industry_category),]) # 0 NA's in Job Industry
+nrow(demog[is.na(demog$wealth_segment),]) # 0 NA's in Wealth Segment
+nrow(demog[is.na(demog$deceased_indicator),]) # 0 NA's
+nrow(demog[is.na(demog$owns_car),]) # 0 NA's
+nrow(demog[is.na(demog$tenure),]) # 87 NA's in Tenure - Remove
+nrow(demog[is.na(demog$DOB) & is.na(demog$tenure),]) # They are the same
+
+#--- Let's remove missing tenure and DOB by overwriting
+demog <- demog[!is.na(demog$DOB),]
+demog <- demog[!is.na(demog$tenure),]
+#Let's change Nigh Net Worth to Affluent Customer in wealth segment
+str(demog)
+levels(demog$wealth_segment)
+demog$wealth_segment <- gsub('High Net Worth','Affluent Customer',demog$wealth_segment, fixed = T)
+demog$wealth_segment <- factor(demog$wealth_segment)
+levels(demog$wealth_segment)
+summary(demog)
+# Let's decide what to do with NA's
+nrow(demog[!complete.cases(demog),])
+head(demog)
+str(demog)
+# Let's turn deceased_indicator,car ownership, and industry into categorical
+demog$deceased_indicator <- factor(demog$deceased_indicator)
+demog$owns_car <- factor(demog$owns_car)
+demog$job_industry_category <- factor(demog$job_industry_category)
+summary(demog)
+str(demog)
+
+head(transactions)
+str(transactions)
+levels(transactions$product_size)
+# Demog and Address Data sets are prepared
+
+#Let's work on transactions
+head(transactions)
+str(transactions)
+backup_transaction <- transactions
+# Let's convert transaction date to date format
+transactions$transaction_date <- as.Date(transactions$transaction_date)
+# Let's convert product first sold date to date format
+transactions$product_first_sold_date <- as.Date(as.numeric(transactions$product_first_sold_date), origin = "1899-12-30")
+# Let's convert list_price to numeric
+transactions$list_price <- gsub('  ','',transactions$list_price)
+transactions$list_price <- as.numeric(transactions$list_price)
+# Let's convert standard cost to numeric
+transactions$standard_cost <- gsub('   ','',transactions$standard_cost)
+transactions$standard_cost <- as.numeric(transactions$standard_cost)
+
+levels(transactions$product_line)
+levels(transactions$product_class)
+levels(transactions$product_size)
+levels(transactions$brand)
+
+# Let's investigate NA's
+head(transactions[!complete.cases(transactions),])
+nrow(transactions[!complete.cases(transactions),]) # 555 NA's
+colnames(transactions[!complete.cases(transactions),])
+apply(transactions,2, function(x) length(which(is.na(x))))
+# All the columns that are missing contain important information. We should remove them all
+transactions <- transactions[complete.cases(transactions),]
+str(transactions)
+
+# Transaction dataset is cleaned.
+backup_newcustomer <- newcustomer
+head(newcustomer)
+colnames(newcustomer)
+# Let's remove unneeded columns from dataset
+newcustomer <- newcustomer[,c(-17,-18,-19,-20,-21)]
+colnames(newcustomer)
+str(newcustomer)
+# Because newcustomer and demog data are similar, we can reuse some code
+newcustomer$wealth_segment <- gsub('High Net Worth','Affluent Customer',newcustomer$wealth_segment, fixed = T)
+newcustomer$wealth_segment <- factor(newcustomer$wealth_segment)
+levels(demog$wealth_segment)
+
+newcustomer$deceased_indicator <- factor(newcustomer$deceased_indicator)
+newcustomer$owns_car <- factor(newcustomer$owns_car)
+newcustomer$job_industry_category <- factor(newcustomer$job_industry_category)
+summary(demog)
+
+newcustomer$gender <- factor(newcustomer$gender)
+levels(newcustomer$gender)
+newcustomer$gender <- gsub('U','Unisex',newcustomer$gender)
+newcustomer$gender <- factor(newcustomer$gender)
+levels(newcustomer$gender)
+
+# ---
+
+str(newcustomer)
+
+newcustomer$past_3_years_bike_related_purchases <- as.numeric(newcustomer$past_3_years_bike_related_purchases)
+newcustomer$DOB <- as.Date(as.numeric(newcustomer$DOB), origin = "1899-12-30")
+
+newcustomer$state <- gsub('New South Wales','NSW',newcustomer$state)
+newcustomer$state <- gsub('Victoria','VIC',newcustomer$state)
+newcustomer$state <- factor(newcustomer$state)
+levels(newcustomer$state)
+
+newcustomer$country <- factor(newcustomer$country)
+newcustomer$property_valuation <- as.numeric(newcustomer$property_valuation)
+
+# Let's examine NA's
+apply(newcustomer,2,function(x) length(which(is.na(x))))
+# The majority of customers don't have DOB. Missing Job titles are not as important as job industry. Let's keep 
+
+# The dataset is prepared and ready for analysis
+
+
